@@ -1,5 +1,5 @@
 from .key import Key
-from .configuration import Configuration_v1, Configuration_v2, Configuration_v2b, Configuration_Lightpix_v1
+from .configuration import Configuration_v1, Configuration_v2, Configuration_v2b, Configuration_Lightpix_v1, Configuration_v2d
 from .packet import Packet_v1, Packet_v2
 
 class Chip(object):
@@ -25,6 +25,8 @@ class Chip(object):
             self.config = Configuration_Lightpix_v1()
         elif self.asic_version == '2b':
             self.config = Configuration_v2b()
+        elif self.asic_version == '2d':
+            self.config = Configuration_v2d()
         else:
             raise RuntimeError('chip asic version is invalid')
         chip_key = Key(chip_key)
@@ -61,7 +63,7 @@ class Chip(object):
         '''
         if self.asic_version == 1:
             return True
-        elif self.asic_version in (2, 'lightpix-1'):
+        elif self.asic_version in (2, '2b', '2d', 'lightpix-1'):
             return self.config.chip_id == self.chip_id
 
     def get_configuration_packets(self, packet_type, registers=None):
@@ -77,14 +79,17 @@ class Chip(object):
         packets = []
         if self.asic_version == 1:
             packet_register_data = enumerate(conf.all_data())
-        elif self.asic_version in (2, 'lightpix-1', '2b'):
+        elif self.asic_version in (2, 'lightpix-1', '2b', '2d'):
             packet_register_data = zip(*conf.some_data(registers))
         for i, data in packet_register_data:
             if i not in registers:
                 continue
             if self.asic_version == 1:
                 packet = Packet_v1()
-            else:
+            elif self.asic_version == '2d':
+                packet = Packet_v2()
+                packet.magic_word = 0x89504E47
+            else:# self.asic_version in (2, 'lightpix-1', '2b'):
                 packet = Packet_v2()
             packet.packet_type = packet_type
             packet.chip_id = self.chip_id
@@ -98,6 +103,16 @@ class Chip(object):
                 raise ValueError('incorrect packet_type for configuration packets')
             packet.assign_parity()
             packets.append(packet)
+            #if packet_type == packet.packet_v2.Packet_v2.CONFIG_WRITE_PACKET:
+            #    print('---------------------------------------------------')
+            #    print('CONGIF_WRITE_PACKET')
+            #    print('bits:',packet.bits)
+            #    print('magic_word:',packet.magic_word)
+            #if packet_type == packet.packet_v2.Packet_v2.CONFIG_READ_PACKET:
+            #    print('---------------------------------------------------')
+            #    print('CONGIF_READ_PACKET')
+            #    print('bits:',packet.bits)
+            #    print('magic_word:',packet.magic_word)
         return packets
 
     def get_configuration_write_packets(self, registers=None):

@@ -9,7 +9,7 @@ from copy import copy
 from . import configs
 from .key import Key
 from .chip import Chip
-from .configuration import Configuration_v1, Configuration_v2, Configuration_Lightpix_v1
+from .configuration import Configuration_v1, Configuration_v2, Configuration_v2d, Configuration_Lightpix_v1
 from .packet import Packet_v1, Packet_v2, PacketCollection
 from . import bitarrayhelper as bah
 
@@ -145,17 +145,20 @@ class Controller(object):
     _enable_piso_upstream = {
         2: 'enable_miso_upstream',
         'lightpix-1': 'enable_miso_upstream',
-        '2b': 'enable_piso_upstream'
+        '2b': 'enable_piso_upstream',
+        '2d': 'enable_piso_upstream'
     }
     _enable_posi = {
         2: 'enable_mosi',
         'lightpix-1': 'enable_mosi',
-        '2b': 'enable_posi'
+        '2b': 'enable_posi',
+        '2d': 'enable_posi'
     }
     _enable_piso_downstream = {
         2: 'enable_miso_downstream',
         'lightpix-1': 'enable_miso_downstream',
-        '2b': 'enable_piso_downstream'
+        '2b': 'enable_piso_downstream',
+        '2d': 'enable_piso_downstream'
     }
 
     def __init__(self):
@@ -375,7 +378,7 @@ class Controller(object):
         if system_info['asic_version'] == 1:
             print('loading v1 controller...')
             return self.load_controller(filename)
-        if system_info['asic_version'] in (2, 'lightpix-1', '2b'):
+        if system_info['asic_version'] in (2, 'lightpix-1', '2b', '2d'):
             print(f'loading {system_info["asic_version"]} network...')
             return self.load_network(filename, version=system_info['asic_version'])
 
@@ -796,7 +799,7 @@ class Controller(object):
             getattr(parent_chip.config, self._enable_piso_upstream[parent_chip.asic_version])[parent_uart] = 1
             packets += parent_chip.get_configuration_write_packets(
                 registers=parent_chip.config.register_map[self._enable_piso_upstream[parent_chip.asic_version]])
-            if parent_chip.asic_version in ('2b',):
+            if parent_chip.asic_version in ('2b','2d',):
                 setattr(parent_chip.config, f'i_tx_diff{parent_uart}', i_tx_diff)
                 setattr(parent_chip.config, f'tx_slices{parent_uart}', tx_slices)
                 registers = list(parent_chip.config.register_map[f'i_tx_diff{parent_uart}']) + list(parent_chip.config.register_map[f'tx_slices{parent_uart}'])
@@ -829,7 +832,7 @@ class Controller(object):
                 getattr(chip.config, self._enable_piso_downstream[chip.asic_version])[ds_uart] = 1
             packets += chip.get_configuration_write_packets(
                 registers=chip.config.register_map[self._enable_piso_downstream[chip.asic_version]])
-            if chip.asic_version in ('2b',):
+            if chip.asic_version in ('2b','2d'):
                 setattr(chip.config, f'i_tx_diff{ds_uart}', i_tx_diff)
                 setattr(chip.config, f'tx_slices{ds_uart}', tx_slices)
                 registers = list(chip.config.register_map[f'i_tx_diff{ds_uart}']) + list(chip.config.register_map[f'tx_slices{ds_uart}'])
@@ -1444,7 +1447,7 @@ class Controller(object):
             chip.config.enable_analog_monitor(channel)
             self.write_configuration(chip_key, chip.config.csa_monitor_select_addresses)
             chip.config.csa_monitor_select = [0] * chip.config.num_channels
-        elif chip.asic_version in (2, 'lightpix-1', '2b'):
+        elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
             chip.config.csa_monitor_select[channel] = 1
             self.write_configuration(chip_key, chip.config.register_map['csa_monitor_select'])
         else:
@@ -1464,7 +1467,7 @@ class Controller(object):
             if chip.asic_version == 1:
                 chip.config.disable_analog_monitor()
                 self.write_configuration(chip_key, chip.config.csa_monitor_select_addresses)
-            elif chip.asic_version in (2, 'lightpix-1', '2b'):
+            elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
                 if not channel is None:
                     chip.config.csa_monitor_select[channel] = 0
                 else:
@@ -1487,7 +1490,7 @@ class Controller(object):
             self.write_configuration(chip_key, chip.config.csa_testpulse_enable_addresses +
                                      [chip.config.csa_testpulse_dac_amplitude_address])
             chip.config.csa_testpulse_enable = [1] * chip.config.num_channels
-        elif chip.asic_version in (2, 'lightpix-1', '2b'):
+        elif chip.asic_version in (2, 'lightpix-1', '2b' ,'2d'):
             for channel in channel_list:
                 chip.config.csa_testpulse_enable[channel] = 0
             chip.config.csa_testpulse_dac = start_dac
@@ -1509,7 +1512,7 @@ class Controller(object):
                 raise ValueError('Minimum DAC exceeded')
             self.write_configuration(chip_key, [chip.config.csa_testpulse_dac_amplitude_address],
                                      write_read=read_time)
-        elif chip.asic_version in (2, 'lightpix-1', '2b'):
+        elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
             if chip.config.csa_testpulse_dac - pulse_dac < min_dac:
                 raise ValueError('Minimum DAC exceeded')
             try:
@@ -1535,7 +1538,7 @@ class Controller(object):
             if chip.asic_version == 1:
                 chip.config.disable_testpulse(channel_list)
                 self.write_configuration(chip_key, chip.config.csa_testpulse_enable_addresses)
-            elif chip.asic_version in (2, 'lightpix-1', '2b'):
+            elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
                 for channel in channel_list:
                     chip.config.csa_testpulse_enable[channel] = 1
                 self.write_configuration(chip_key, chip.config.register_map['csa_testpulse_enable'])
@@ -1558,7 +1561,7 @@ class Controller(object):
             if chip.asic_version == 1:
                 chip.config.disable_channels(channel_list)
                 self.write_configuration(chip_key, Configuration_v1.channel_mask_addresses)
-            elif chip.asic_version in (2, 'lightpix-1', '2b'):
+            elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
                 for channel in channel_list:
                     chip.config.channel_mask[channel] = 1
                     self.write_configuration(chip_key, chip.config.register_map['channel_mask'])
@@ -1580,7 +1583,7 @@ class Controller(object):
             if chip.asic_version == 1:
                 chip.config.enable_channels(channel_list)
                 self.write_configuration(chip_key, Configuration_v1.channel_mask_addresses)
-            elif chip.asic_version in (2, 'lightpix-1', '2b'):
+            elif chip.asic_version in (2, 'lightpix-1', '2b', '2d'):
                 for channel in channel_list:
                     chip.config.channel_mask[channel] = 0
                 self.write_configuration(chip_key, chip.config.register_map['channel_mask'])
