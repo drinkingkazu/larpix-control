@@ -78,6 +78,7 @@ class Packet_v2(object):
     # only read/write packets
     register_address_bits = slice(10,18)
     register_data_bits = slice(18,26)
+    magic_word_bits = slice(26,58)
 
     fifo_diagnostics_enabled = False
 
@@ -421,6 +422,17 @@ class Packet_v2(object):
         bit_slice = self.chip_id_bits
         self.bits[bit_slice] = bah.fromuint(value, bit_slice, endian=self.endian)
 
+    @property
+    def magic_word(self):
+        bit_slice = self.magic_word_bits
+        return bah.touint(self.bits[bit_slice], endian=self.endian)
+
+    @magic_word.setter
+    @_clears_cached_int
+    def magic_word(self, value):
+        bit_slice = self.magic_word_bits
+        self.bits[bit_slice] = bah.fromuint(value, bit_slice, endian=self.endian)
+
     @classmethod
     def _basic_getter(cls, name):
         bit_slice = getattr(cls, name + '_bits')
@@ -448,3 +460,4 @@ Packet_v2.register_address = property(Packet_v2._basic_getter('register_address'
 Packet_v2.register_data = property(Packet_v2._basic_getter('register_data'),Packet_v2._basic_setter('register_data'))
 Packet_v2.local_fifo = property(Packet_v2._basic_getter('local_fifo'),Packet_v2._basic_setter('local_fifo'))
 Packet_v2.shared_fifo = property(Packet_v2._basic_getter('shared_fifo'),Packet_v2._basic_setter('shared_fifo'))
+Packet_v2.magic_word = property(Packet_v2._basic_getter('magic_word'),Packet_v2._basic_setter('magic_word'))
