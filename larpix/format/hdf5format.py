@@ -436,6 +436,7 @@ dtypes['2.2'] = dtypes['2.1'].copy() # compatible with v2 packets, timestamp pac
 dtypes['2.3'] = dtypes['2.2'].copy() # compatible with v2 packets, timestamp packets, sync packets, and trigger packets only
 dtypes['2.3']['packets'].append(('receipt_timestamp','u4'))
 dtypes['2.4'] = dtypes['2.3'].copy() # compatible with v2 packets, timestamp packets, sync packets, and trigger packets only
+dtypes['2.4']['packets'].append(('pixel_id','u8'))
 dtypes['2.4']['configs'] = [
     ('timestamp','u8'),
     ('io_group','u1'),
@@ -524,6 +525,7 @@ dtype_property_index_lookup['2.2'] = dtype_property_index_lookup['2.1'].copy()
 dtype_property_index_lookup['2.3'] = dtype_property_index_lookup['2.2'].copy()
 dtype_property_index_lookup['2.3']['packets']['receipt_timestamp'] = 21
 dtype_property_index_lookup['2.4'] = dtype_property_index_lookup['2.3'].copy()
+dtype_property_index_lookup['2.4']['packets']['pixel_id'] = 22
 dtype_property_index_lookup['2.4']['configs'] = {
     'timestamp': 0,
     'io_group': 1,
@@ -714,6 +716,12 @@ def _parse_packets_v2_3(row, message_dset, *args, **kwargs):
         p.receipt_timestamp = row['receipt_timestamp']
     return p
 
+def _parse_packets_v2_4(row, message_dset, *args, **kwargs):
+    p = _parse_packets_v2_3(row, message_dset, *args, **kwargs)
+    if isinstance(p, Packet_v2):
+        p.pixel_id = row['pixel_id']
+    return p
+
 def _format_configs_chip_v2_4(chip, version='2.4', dset='configs', timestamp=0, *args, **kwargs):
     row = np.zeros((1,),dtype=dtypes[version][dset])
     row['timestamp'] = timestamp
@@ -844,7 +852,7 @@ _parse_method_lookup = {
         'packets': _parse_packets_v2_3
     },
     '2.4': {
-        'packets': _parse_packets_v2_3,
+        'packets': _parse_packets_v2_4,
         'configs': _parse_configs_v2_4
     }
 }
@@ -953,7 +961,7 @@ def to_file(filename, packet_list=None, chip_list=None, mode='a', version=None, 
 
     with h5py.File(filename, mode) as f:
         version, message_dset, _configs_dset = init_file(f, version, chip_list)
-
+        print('using message_dset',message_dset)
         # Create datasets
         if version == '0.0':
             packet_dset_name = 'raw_packet'
@@ -1018,7 +1026,9 @@ def to_file(filename, packet_list=None, chip_list=None, mode='a', version=None, 
             encoded_packets = list(filter(bool, [_encode_packet(packet, version, packet_dset_name) for packet in packet_list]))
 
         if message_dset:
-            message_dset_name = message_dset.name.removeprefix('/')
+            if message_dset.name.startswith('/'):
+                message_dset_name = message_dset.name[1:]
+            #message_dset_name = message_dset.name.removeprefix('/')
             for i, packet in enumerate(packet_list):
                 if packet.__class__ in _format_method_lookup[version].get(message_dset_name, tuple()):
                     encoded_message = _format_method_lookup[version][message_dset_name][packet.__class__](packet, counter=message_dset.shape[0] + len(messages))
